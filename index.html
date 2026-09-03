@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Patient Tracker</title>
+<meta name="theme-color" content="#0d6e6e" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="app-header">
+  <h1>Patient Tracker</h1>
+  <button id="notifPermBtn" class="ghost-btn" title="Enable review alerts" hidden>🔔 Enable alerts</button>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button class="tab-btn active" data-tab="new-patient" role="tab">New Patient</button>
+  <button class="tab-btn" data-tab="patients" role="tab">Patients <span class="count" id="count-patients"></span></button>
+  <button class="tab-btn" data-tab="discuss" role="tab">To Discuss <span class="count" id="count-discuss"></span></button>
+  <button class="tab-btn" data-tab="review" role="tab">Repeat Review <span class="count" id="count-review"></span></button>
+</nav>
+
+<main>
+
+  <!-- NEW PATIENT TAB -->
+  <section id="new-patient" class="tab-panel active">
+    <form id="patientForm" autocomplete="off">
+      <div class="field">
+        <label for="pName">Name</label>
+        <input type="text" id="pName" name="name" required placeholder="Full name" />
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="pMRN">MRN</label>
+          <input type="text" id="pMRN" name="mrn" placeholder="Medical record number" />
+        </div>
+        <div class="field">
+          <label for="pNHS">NHS Number</label>
+          <input type="text" id="pNHS" name="nhs" placeholder="e.g. 123 456 7890" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="pDOB">Date of Birth</label>
+        <input type="date" id="pDOB" name="dob" />
+      </div>
+
+      <div class="field">
+        <label for="pDetails">Details</label>
+        <textarea id="pDetails" name="details" rows="4" placeholder="Clinical details / notes"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Images</label>
+        <div class="image-buttons">
+          <label class="btn secondary-btn">
+            📷 Take Photo
+            <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden />
+          </label>
+          <label class="btn secondary-btn">
+            📁 Add Files
+            <input type="file" id="fileInput" accept="image/*" multiple hidden />
+          </label>
+        </div>
+        <div id="imagePreview" class="image-preview-grid"></div>
+      </div>
+
+      <button type="submit" class="btn primary-btn full-width">Add New Patient</button>
+    </form>
+  </section>
+
+  <!-- PATIENTS TAB -->
+  <section id="patients" class="tab-panel">
+    <div class="list" id="patientsList"></div>
+    <p class="empty-msg" id="patientsEmpty">No patients added yet.</p>
+  </section>
+
+  <!-- TO DISCUSS TAB -->
+  <section id="discuss" class="tab-panel">
+    <div class="list" id="discussList"></div>
+    <p class="empty-msg" id="discussEmpty">No patients marked to discuss.</p>
+  </section>
+
+  <!-- REPEAT REVIEW TAB -->
+  <section id="review" class="tab-panel">
+    <div class="list" id="reviewList"></div>
+    <p class="empty-msg" id="reviewEmpty">No patients awaiting repeat review.</p>
+  </section>
+
+</main>
+
+<!-- Patient detail modal -->
+<div id="detailModal" class="modal" hidden>
+  <div class="modal-content">
+    <button class="modal-close" data-close>&times;</button>
+    <div id="detailBody"></div>
+  </div>
+</div>
+
+<!-- Repeat review scheduling modal -->
+<div id="reviewModal" class="modal" hidden>
+  <div class="modal-content">
+    <button class="modal-close" data-close>&times;</button>
+    <h2>Schedule Repeat Review</h2>
+    <p class="modal-sub">Choose a time (24h) and a reason. You'll get an alert on this device when the time is reached.</p>
+    <div class="field">
+      <label for="reviewTime">Time</label>
+      <input type="time" id="reviewTime" required />
+    </div>
+    <div class="field">
+      <label for="reviewReason">Reason</label>
+      <textarea id="reviewReason" rows="3" placeholder="Reason for repeat review"></textarea>
+    </div>
+    <button id="confirmReviewBtn" class="btn primary-btn full-width">Confirm</button>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="js/db.js"></script>
+<script src="js/notifications.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
