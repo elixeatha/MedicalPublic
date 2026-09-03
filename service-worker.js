@@ -1,6 +1,12 @@
 // App-shell cache for offline use, plus a fallback path for showNotification()
 // on platforms that require a Service Worker to display notifications.
-const CACHE_NAME = 'patient-tracker-v1';
+//
+// Bump this version whenever the cached assets change. It's what makes the
+// browser recognize this file as different from the one it already has
+// installed, which is what triggers install/activate to run again and
+// refresh the cache -- without it, an installed app can keep serving old
+// content indefinitely even after new code is deployed.
+const CACHE_NAME = 'patient-tracker-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -27,10 +33,21 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Network-first: always try to serve the latest deployed version when
+// online, and only fall back to the cache (keeping the app usable offline)
+// if the network request fails. This also means the cache no longer goes
+// stale between deploys even if CACHE_NAME is forgotten -- a successful
+// network response always overwrites the cached copy.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request).catch(() => cached))
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
 
