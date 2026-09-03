@@ -127,9 +127,11 @@
       toast('Name is required');
       return;
     }
+    const sexInput = $('#sexGroup input[name="sex"]:checked');
     const patient = {
       id: uid(),
       name,
+      sex: sexInput ? sexInput.value : '',
       mrn: $('#pMRN').value.trim(),
       nhs: $('#pNHS').value.trim(),
       dob: $('#pDOB').value,
@@ -168,6 +170,34 @@
     return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
   }
 
+  function calcAge(dob) {
+    if (!dob) return null;
+    const birth = new Date(dob + 'T00:00:00');
+    if (Number.isNaN(birth.getTime())) return null;
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+    return age >= 0 ? age : null;
+  }
+
+  function sexAbbrev(sex) {
+    return sex === 'male' ? 'M' : sex === 'female' ? 'F' : sex === 'other' ? 'O' : '';
+  }
+
+  function sexLabel(sex) {
+    return sex === 'male' ? 'Male' : sex === 'female' ? 'Female' : sex === 'other' ? 'Other' : '—';
+  }
+
+  function ageSexBadge(p) {
+    const age = calcAge(p.dob);
+    const abbrev = sexAbbrev(p.sex);
+    const parts = [];
+    if (age !== null) parts.push(`${age}`);
+    if (abbrev) parts.push(abbrev);
+    return parts.join(' · ');
+  }
+
   function reviewTagHtml(p) {
     if (p.status === 'discuss') {
       return `<span class="review-tag discuss">To discuss</span>`;
@@ -186,11 +216,15 @@
     const thumb = firstImg
       ? `<img src="${firstImg.dataUrl}" alt="" />`
       : `<span class="no-img">👤</span>`;
+    const badge = ageSexBadge(p);
 
     return `
       <div class="patient-card" data-id="${p.id}">
         <div class="drag-handle" aria-label="Drag to reorder" title="Drag to reorder">⠿</div>
-        <div class="thumb-wrap" data-action="view">${thumb}</div>
+        <div class="thumb-col">
+          <div class="thumb-wrap" data-action="view">${thumb}</div>
+          ${badge ? `<span class="age-sex">${escapeHtml(badge)}</span>` : ''}
+        </div>
         <div class="main" data-action="view">
           <h3>${escapeHtml(p.name)}</h3>
           <p class="meta">MRN: ${escapeHtml(p.mrn) || '—'} &nbsp;•&nbsp; NHS: ${escapeHtml(p.nhs) || '—'} &nbsp;•&nbsp; DOB: ${formatDob(p.dob)}</p>
@@ -304,22 +338,14 @@
         </div>`).join('')}</div>`;
   }
 
-  function openDetail(id) {
-    const p = patients.find((x) => x.id === id);
-    if (!p) return;
-    const imagesHtml = (p.images && p.images.length)
+  function imagesHtmlFor(p) {
+    return (p.images && p.images.length)
       ? `<div class="detail-images">${p.images.map((img) => `<img src="${img.dataUrl}" alt="${escapeHtml(img.name)}" data-full="${img.dataUrl}" />`).join('')}</div>`
       : `<p class="empty-msg" style="padding:1rem 0;">No images attached.</p>`;
+  }
 
-    $('#detailBody').innerHTML = `
-      <h2>${escapeHtml(p.name)}</h2>
-      <div class="detail-row"><span>MRN</span><span>${escapeHtml(p.mrn) || '—'}</span></div>
-      <div class="detail-row"><span>NHS Number</span><span>${escapeHtml(p.nhs) || '—'}</span></div>
-      <div class="detail-row"><span>Date of Birth</span><span>${formatDob(p.dob)}</span></div>
-      ${p.status === 'repeat_review' && p.reviewTime ? `<div class="detail-row"><span>Repeat review</span><span>${new Date(p.reviewTime).toLocaleString()}</span></div>` : ''}
-      ${p.reviewReason ? `<div class="detail-row"><span>Reason</span><span>${escapeHtml(p.reviewReason)}</span></div>` : ''}
-      <p style="margin-top:0.9rem; white-space:pre-wrap;">${escapeHtml(p.details) || 'No details entered.'}</p>
-      ${imagesHtml}
+  function notesSectionHtml(p) {
+    return `
       <div class="notes-section">
         <h3>Additional Information / Notes</h3>
         ${notesListHtml(p)}
@@ -327,13 +353,85 @@
           <textarea id="newNoteText" rows="2" placeholder="Add additional information..."></textarea>
           <button type="button" id="addNoteBtn" class="btn secondary-btn">Add note</button>
         </div>
-      </div>
-    `;
-    $$('.detail-images img', $('#detailBody')).forEach((img) => {
+      </div>`;
+  }
+
+  function renderDetailBody(p, editing) {
+    const body = $('#detailBody');
+
+    if (editing) {
+      body.innerHTML = `
+        <div class="detail-header"><h2>${escapeHtml(p.name)}</h2></div>
+        <div class="detail-row"><span>Sex</span><span>${sexLabel(p.sex)}</span></div>
+        <div class="field">
+          <label for="editMRN">MRN</label>
+          <input type="text" id="editMRN" value="${escapeHtml(p.mrn)}" />
+        </div>
+        <div class="field">
+          <label for="editNHS">NHS Number</label>
+          <input type="text" id="editNHS" value="${escapeHtml(p.nhs)}" />
+        </div>
+        <div class="field">
+          <label for="editDOB">Date of Birth</label>
+          <input type="date" id="editDOB" value="${p.dob || ''}" />
+        </div>
+        <div class="field">
+          <label for="editDetails">Details</label>
+          <textarea id="editDetails" rows="4">${escapeHtml(p.details)}</textarea>
+        </div>
+        <div class="edit-actions">
+          <button type="button" id="saveEditBtn" class="btn primary-btn">Save</button>
+          <button type="button" id="cancelEditBtn" class="btn secondary-btn">Cancel</button>
+        </div>
+        ${imagesHtmlFor(p)}
+      `;
+      $('#saveEditBtn').addEventListener('click', () => saveEdit(p.id));
+      $('#cancelEditBtn').addEventListener('click', () => renderDetailBody(p, false));
+    } else {
+      const age = calcAge(p.dob);
+      body.innerHTML = `
+        <div class="detail-header">
+          <h2>${escapeHtml(p.name)}</h2>
+          <button type="button" id="editDetailsBtn" class="btn secondary-btn edit-btn">✏️ Edit</button>
+        </div>
+        <div class="detail-row"><span>Sex</span><span>${sexLabel(p.sex)}</span></div>
+        <div class="detail-row"><span>MRN</span><span>${escapeHtml(p.mrn) || '—'}</span></div>
+        <div class="detail-row"><span>NHS Number</span><span>${escapeHtml(p.nhs) || '—'}</span></div>
+        <div class="detail-row"><span>Date of Birth</span><span>${formatDob(p.dob)}${age !== null ? ` (${age}y)` : ''}</span></div>
+        ${p.status === 'repeat_review' && p.reviewTime ? `<div class="detail-row"><span>Repeat review</span><span>${new Date(p.reviewTime).toLocaleString()}</span></div>` : ''}
+        ${p.reviewReason ? `<div class="detail-row"><span>Reason</span><span>${escapeHtml(p.reviewReason)}</span></div>` : ''}
+        <p style="margin-top:0.9rem; white-space:pre-wrap;">${escapeHtml(p.details) || 'No details entered.'}</p>
+        ${imagesHtmlFor(p)}
+        ${notesSectionHtml(p)}
+      `;
+      $('#editDetailsBtn').addEventListener('click', () => renderDetailBody(p, true));
+    }
+
+    $$('.detail-images img', body).forEach((img) => {
       img.addEventListener('click', () => openFullImage(img.dataset.full));
     });
-    $('#addNoteBtn').addEventListener('click', () => addNote(p.id));
+    const addNoteBtn = $('#addNoteBtn');
+    if (addNoteBtn) addNoteBtn.addEventListener('click', () => addNote(p.id));
+  }
+
+  function openDetail(id) {
+    const p = patients.find((x) => x.id === id);
+    if (!p) return;
+    renderDetailBody(p, false);
     $('#detailModal').hidden = false;
+  }
+
+  async function saveEdit(id) {
+    const p = patients.find((x) => x.id === id);
+    if (!p) return;
+    p.mrn = $('#editMRN').value.trim();
+    p.nhs = $('#editNHS').value.trim();
+    p.dob = $('#editDOB').value;
+    p.details = $('#editDetails').value.trim();
+    await PatientDB.put(p);
+    renderDetailBody(p, false);
+    renderAll();
+    toast('Patient details updated');
   }
 
   async function addNote(id) {

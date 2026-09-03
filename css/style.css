@@ -159,6 +159,38 @@ textarea { resize: vertical; }
 
 .full-width { width: 100%; margin-top: 0.5rem; }
 
+.segmented {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.segment {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  background: #fff;
+}
+
+.segment input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.segment:has(input:checked) {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+
 .image-buttons {
   display: flex;
   gap: 0.6rem;
@@ -238,6 +270,14 @@ textarea { resize: vertical; }
 
 .drag-handle:active { cursor: grabbing; }
 
+.thumb-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
 .patient-card .thumb-wrap {
   width: 56px;
   height: 56px;
@@ -250,6 +290,14 @@ textarea { resize: vertical; }
   justify-content: center;
   border: 1px solid var(--border);
   cursor: pointer;
+}
+
+.age-sex {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-align: center;
+  white-space: nowrap;
 }
 
 .patient-card .thumb-wrap img {
@@ -380,6 +428,29 @@ textarea { resize: vertical; }
 
 .modal h2 { margin-top: 0; font-size: 1.1rem; }
 .modal-sub { font-size: 0.82rem; color: var(--text-muted); margin-top: -0.5rem; }
+
+.detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.detail-header h2 { margin: 0; }
+
+.edit-btn {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.edit-actions .btn { flex: 1; }
 
 .detail-images {
   display: grid;
