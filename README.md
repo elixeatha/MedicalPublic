@@ -5,13 +5,17 @@ keeping a working list of patients on a phone or tablet.
 
 ## Features
 
-- **New Patient** tab: enter Name, MRN, NHS number, Date of Birth and
-  Details, and attach images either by taking a photo with the device
-  camera or adding existing files. Tap **Add new patient** to save.
-- **Patients** tab: card list of everyone added, showing a summary and a
-  thumbnail. Tap a card to open the full record, view all attached
-  images, and add timestamped notes (see below). Each card has an
-  actions dropdown on the right:
+- **New Patient** tab: enter Name, Sex (Male / Female / Other), MRN, NHS
+  number, Date of Birth and Details, and attach images either by taking
+  a photo with the device camera or adding existing files. Tap
+  **Add new patient** to save.
+- **Patients** tab: card list of everyone added, with each card showing
+  the patient's age and sex (e.g. "40 · M") next to their photo, plus a
+  summary. Tap a card to open the full record, view all attached
+  images, and add timestamped notes (see below). An **✏️ Edit** button
+  in the record lets you update the MRN, NHS number, Date of Birth and
+  Details at any time after the patient was added. Each card also has
+  an actions dropdown on the right:
   - **Remove** — deletes the patient permanently.
   - **To discuss** — moves the patient to the **To Discuss** tab.
   - **Needs repeat review** — opens a dialog to pick a 24-hour time and a
