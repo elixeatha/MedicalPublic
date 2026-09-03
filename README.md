@@ -9,20 +9,30 @@ keeping a working list of patients on a phone or tablet.
   Details, and attach images either by taking a photo with the device
   camera or adding existing files. Tap **Add new patient** to save.
 - **Patients** tab: card list of everyone added, showing a summary and a
-  thumbnail. Tap a card to open the full record and view all attached
-  images. Each card has an actions dropdown on the right:
+  thumbnail. Tap a card to open the full record, view all attached
+  images, and add timestamped notes (see below). Each card has an
+  actions dropdown on the right:
   - **Remove** — deletes the patient permanently.
   - **To discuss** — moves the patient to the **To Discuss** tab.
   - **Needs repeat review** — opens a dialog to pick a 24-hour time and a
     reason, then moves the patient to the **Repeat Review** tab.
-- **To Discuss** tab: patients flagged for discussion.
-- **Repeat Review** tab: patients awaiting a scheduled review, tagged with
-  the time it's due (and highlighted once overdue). When the device's
-  local clock reaches that time, the app fires a browser/OS notification
-  with the reason.
+  - **Cath Lab** — moves the patient to the **Cath Lab** tab.
+- **To Discuss**, **Repeat Review** and **Cath Lab** tabs: patients
+  moved there via the actions dropdown. Repeat Review entries are tagged
+  with the time they're due (and highlighted once overdue); when the
+  device's local clock reaches that time, the app fires a browser/OS
+  notification with the reason.
+- **Additional notes**: open any patient's record and use the notes box
+  at the bottom to add extra information at any time — each entry is
+  kept with a timestamp, building up a running log alongside the
+  original Details field.
+- **Drag to reorder**: on every list tab, drag a card by its ⠿ handle to
+  reorder patients within that tab (e.g. to prioritize who's seen or
+  reviewed first). The order is saved per tab and persists across
+  reloads.
 
-All data (including images) is stored locally in the browser via
-IndexedDB — nothing is sent to a server.
+All data (including images and notes) is stored locally in the browser
+via IndexedDB — nothing is sent to a server.
 
 ## Running it
 
