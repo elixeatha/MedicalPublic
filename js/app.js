@@ -10,6 +10,24 @@
 
   const uid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+  // ---------- Manual ordering helpers ----------
+  // Each patient carries an `order` number scoped to its current status list;
+  // lower sorts first. New patients are prepended to Patients; moving a
+  // patient to another tab appends it to the bottom of that tab.
+  function ordersFor(status) {
+    return patients.filter((p) => p.status === status).map((p) => p.order || 0);
+  }
+
+  function orderAtTop(status) {
+    const orders = ordersFor(status);
+    return orders.length ? Math.min(...orders) - 1 : 0;
+  }
+
+  function orderAtBottom(status) {
+    const orders = ordersFor(status);
+    return orders.length ? Math.max(...orders) + 1 : 0;
+  }
+
   // ---------- Toast ----------
   let toastTimer = null;
   function toast(msg) {
@@ -80,6 +98,27 @@
     renderImagePreview();
   }
 
+  // ---------- Migrate records saved before notes/ordering existed ----------
+  async function normalizePatients(list) {
+    const byStatus = {};
+    let changed = false;
+    list.forEach((p) => {
+      if (!p.notes) { p.notes = []; changed = true; }
+      (byStatus[p.status] = byStatus[p.status] || []).push(p);
+    });
+    for (const status of Object.keys(byStatus)) {
+      const group = byStatus[status];
+      if (group.every((p) => typeof p.order === 'number')) continue;
+      group.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      group.forEach((p, i) => {
+        if (typeof p.order !== 'number') { p.order = i; changed = true; }
+      });
+    }
+    if (changed) {
+      await Promise.all(list.map((p) => PatientDB.put(p)));
+    }
+  }
+
   // ---------- Add patient ----------
   async function handleAddPatient(e) {
     e.preventDefault();
@@ -99,6 +138,8 @@
       status: 'active',
       reviewTime: null,
       reviewReason: null,
+      notes: [],
+      order: orderAtTop('active'),
       createdAt: new Date().toISOString(),
     };
     await PatientDB.put(patient);
@@ -148,6 +189,7 @@
 
     return `
       <div class="patient-card" data-id="${p.id}">
+        <div class="drag-handle" aria-label="Drag to reorder" title="Drag to reorder">⠿</div>
         <div class="thumb-wrap" data-action="view">${thumb}</div>
         <div class="main" data-action="view">
           <h3>${escapeHtml(p.name)}</h3>
@@ -161,6 +203,7 @@
           <option value="active" ${p.status === 'active' ? 'disabled' : ''}>Move to Patients</option>
           <option value="discuss" ${p.status === 'discuss' ? 'disabled' : ''}>To discuss</option>
           <option value="repeat_review">Needs repeat review</option>
+          <option value="cath_lab" ${p.status === 'cath_lab' ? 'disabled' : ''}>Cath Lab</option>
           <option value="remove">Remove</option>
         </select>
       </div>`;
@@ -195,20 +238,25 @@
     });
   }
 
+  function byOrder(list) {
+    return list.slice().sort((a, b) => (a.order || 0) - (b.order || 0));
+  }
+
   function renderAll() {
-    const active = patients.filter((p) => p.status === 'active')
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    const discuss = patients.filter((p) => p.status === 'discuss');
-    const review = patients.filter((p) => p.status === 'repeat_review')
-      .sort((a, b) => new Date(a.reviewTime) - new Date(b.reviewTime));
+    const active = byOrder(patients.filter((p) => p.status === 'active'));
+    const discuss = byOrder(patients.filter((p) => p.status === 'discuss'));
+    const review = byOrder(patients.filter((p) => p.status === 'repeat_review'));
+    const cathlab = byOrder(patients.filter((p) => p.status === 'cath_lab'));
 
     renderList('#patientsList', '#patientsEmpty', active);
     renderList('#discussList', '#discussEmpty', discuss);
     renderList('#reviewList', '#reviewEmpty', review);
+    renderList('#cathlabList', '#cathlabEmpty', cathlab);
 
     $('#count-patients').textContent = active.length || '';
     $('#count-discuss').textContent = discuss.length || '';
     $('#count-review').textContent = review.length || '';
+    $('#count-cathlab').textContent = cathlab.length || '';
   }
 
   // ---------- Status changes ----------
@@ -216,6 +264,7 @@
     const p = patients.find((x) => x.id === id);
     if (!p) return;
     p.status = status;
+    p.order = orderAtBottom(status);
     if (status !== 'repeat_review') {
       p.reviewTime = null;
       p.reviewReason = null;
@@ -226,6 +275,7 @@
     toast(
       status === 'discuss' ? 'Moved to To Discuss'
       : status === 'active' ? 'Moved to Patients'
+      : status === 'cath_lab' ? 'Moved to Cath Lab'
       : 'Updated'
     );
   }
@@ -242,6 +292,18 @@
   }
 
   // ---------- Detail modal ----------
+  function notesListHtml(p) {
+    const notes = (p.notes || []).slice().sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
+    if (!notes.length) {
+      return `<p class="notes-empty">No additional notes yet.</p>`;
+    }
+    return `<div class="notes-list">${notes.map((n) => `
+        <div class="note-item">
+          <span class="note-time">${new Date(n.createdAt).toLocaleString()}</span>
+          <p class="note-text">${escapeHtml(n.text)}</p>
+        </div>`).join('')}</div>`;
+  }
+
   function openDetail(id) {
     const p = patients.find((x) => x.id === id);
     if (!p) return;
@@ -258,11 +320,37 @@
       ${p.reviewReason ? `<div class="detail-row"><span>Reason</span><span>${escapeHtml(p.reviewReason)}</span></div>` : ''}
       <p style="margin-top:0.9rem; white-space:pre-wrap;">${escapeHtml(p.details) || 'No details entered.'}</p>
       ${imagesHtml}
+      <div class="notes-section">
+        <h3>Additional Information / Notes</h3>
+        ${notesListHtml(p)}
+        <div class="notes-add">
+          <textarea id="newNoteText" rows="2" placeholder="Add additional information..."></textarea>
+          <button type="button" id="addNoteBtn" class="btn secondary-btn">Add note</button>
+        </div>
+      </div>
     `;
     $$('.detail-images img', $('#detailBody')).forEach((img) => {
       img.addEventListener('click', () => openFullImage(img.dataset.full));
     });
+    $('#addNoteBtn').addEventListener('click', () => addNote(p.id));
     $('#detailModal').hidden = false;
+  }
+
+  async function addNote(id) {
+    const p = patients.find((x) => x.id === id);
+    if (!p) return;
+    const textarea = $('#newNoteText');
+    const text = textarea.value.trim();
+    if (!text) {
+      toast('Note is empty');
+      return;
+    }
+    if (!p.notes) p.notes = [];
+    p.notes.push({ id: uid(), text, createdAt: new Date().toISOString() });
+    await PatientDB.put(p);
+    openDetail(id);
+    renderAll();
+    toast('Note added');
   }
 
   function openFullImage(src) {
@@ -300,6 +388,7 @@
     }
 
     p.status = 'repeat_review';
+    p.order = orderAtBottom('repeat_review');
     p.reviewTime = target.toISOString();
     p.reviewReason = reason;
     await PatientDB.put(p);
@@ -354,6 +443,69 @@
     });
   }
 
+  // ---------- Drag-to-reorder ----------
+  // Pointer Events (not native HTML5 drag/drop) so this works with touch on
+  // phones as well as mouse on desktop. The listener is attached once to
+  // each list container (event delegation), so it survives renderList()
+  // rebuilding the container's innerHTML on every render.
+  function makeSortable(container) {
+    let dragEl = null;
+
+    container.addEventListener('pointerdown', (e) => {
+      const handle = e.target.closest('.drag-handle');
+      if (!handle) return;
+      const card = handle.closest('.patient-card');
+      if (!card) return;
+      e.preventDefault();
+      dragEl = card;
+      card.classList.add('dragging');
+      try { handle.setPointerCapture(e.pointerId); } catch (err) { /* ignore */ }
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', onUp);
+      document.addEventListener('pointercancel', onUp);
+    });
+
+    function onMove(e) {
+      if (!dragEl) return;
+      const cards = $$('.patient-card', container).filter((c) => c !== dragEl);
+      for (const sibling of cards) {
+        const rect = sibling.getBoundingClientRect();
+        const mid = rect.top + rect.height / 2;
+        if (e.clientY < mid && sibling.previousElementSibling !== dragEl) {
+          container.insertBefore(dragEl, sibling);
+          break;
+        } else if (e.clientY >= mid && sibling.nextElementSibling !== dragEl) {
+          container.insertBefore(dragEl, sibling.nextSibling);
+          break;
+        }
+      }
+    }
+
+    async function onUp() {
+      if (!dragEl) return;
+      dragEl.classList.remove('dragging');
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      document.removeEventListener('pointercancel', onUp);
+
+      const ids = $$('.patient-card', container).map((c) => c.dataset.id);
+      dragEl = null;
+
+      await Promise.all(ids.map(async (id, index) => {
+        const p = patients.find((x) => x.id === id);
+        if (!p || p.order === index) return;
+        p.order = index;
+        await PatientDB.put(p);
+      }));
+    }
+  }
+
+  function initSortableLists() {
+    ['#patientsList', '#discussList', '#reviewList', '#cathlabList'].forEach((sel) => {
+      makeSortable($(sel));
+    });
+  }
+
   // ---------- Init ----------
   async function init() {
     initTabs();
@@ -365,6 +517,8 @@
     $('#fileInput').addEventListener('change', (e) => handleFiles(e.target.files));
 
     patients = await PatientDB.getAll();
+    await normalizePatients(patients);
+    initSortableLists();
     renderAll();
     ReviewAlerts.rescheduleAll(patients);
 
